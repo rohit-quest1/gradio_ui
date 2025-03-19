@@ -8,6 +8,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
+import gradio as gr
 
 import asyncio
 
@@ -96,25 +97,25 @@ To begin, please provide your Memcached URL for analysis, or type "skip" to proc
         # 1. Reads vs Writes Pie Chart
         read_percent = usage_profiler['read_write_ratio']['read_percent']
         write_percent = usage_profiler['read_write_ratio']['write_percent']
-        fig = px.pie(
+        reads_vs_writes = px.pie(
             values=[read_percent, write_percent], 
             names=['Reads', 'Writes'],
             title='Reads vs Writes',
             color_discrete_sequence=px.colors.sequential.Blues_r
         )
-        fig.update_traces(textinfo='percent+label')
-        fig.update_layout(height=400, width=600)
+        reads_vs_writes.update_traces(textinfo='percent+label')
+        reads_vs_writes.update_layout(height=400, width=600)
         # Save as full HTML with Plotly.js included
-        pio.write_html(fig, './app/output/charts/reads_vs_writes.html', full_html=True, include_plotlyjs='cdn')
+        pio.write_html(reads_vs_writes, './app/output/charts/reads_vs_writes.html', full_html=True, include_plotlyjs='cdn')
         # Also save as image for the chat tab
-        fig.write_image('./app/output/charts/reads_vs_writes.png')
+        reads_vs_writes.write_image('./app/output/charts/reads_vs_writes.png')
 
         # 2. Key Size Distribution Histogram
         key_size_distribution = data_profiler['key_value_stats']['key_stats']['key_size_distribution']['buckets']
         key_sizes = [bucket['bytes_range']['max'] for bucket in key_size_distribution]
         key_counts = [bucket['count'] for bucket in key_size_distribution]
         key_size_df = {'Key Size (bytes)': key_sizes, 'Count': key_counts}
-        fig = px.bar(
+        key_dist = px.bar(
             key_size_df, 
             x='Key Size (bytes)', 
             y='Count',
@@ -122,16 +123,16 @@ To begin, please provide your Memcached URL for analysis, or type "skip" to proc
             color='Count',
             color_continuous_scale=px.colors.sequential.Blues
         )
-        fig.update_layout(bargap=0.1, height=400, width=800)
-        pio.write_html(fig, './app/output/charts/key_size_distribution.html', full_html=True, include_plotlyjs='cdn')
-        fig.write_image('./app/output/charts/key_size_distribution.png')
+        key_dist.update_layout(bargap=0.1, height=400, width=800)
+        pio.write_html(key_dist, './app/output/charts/key_size_distribution.html', full_html=True, include_plotlyjs='cdn')
+        key_dist.write_image('./app/output/charts/key_size_distribution.png')
 
         # 3. Value Size Distribution Histogram
         value_size_distribution = data_profiler['key_value_stats']['value_analysis']['value_size_distribution']['buckets']
         value_sizes = [bucket['bytes_range']['max'] for bucket in value_size_distribution]
         value_counts = [bucket['count'] for bucket in value_size_distribution]
         value_size_df = {'Value Size (bytes)': value_sizes, 'Count': value_counts}
-        fig = px.bar(
+        value_dist = px.bar(
             value_size_df, 
             x='Value Size (bytes)', 
             y='Count',
@@ -139,16 +140,16 @@ To begin, please provide your Memcached URL for analysis, or type "skip" to proc
             color='Count',
             color_continuous_scale=px.colors.sequential.Blues
         )
-        fig.update_layout(bargap=0.1, height=400, width=800)
-        pio.write_html(fig, './app/output/charts/value_size_distribution.html', full_html=True, include_plotlyjs='cdn')
-        fig.write_image('./app/output/charts/value_size_distribution.png')
+        value_dist.update_layout(bargap=0.1, height=400, width=800)
+        pio.write_html(value_dist, './app/output/charts/value_size_distribution.html', full_html=True, include_plotlyjs='cdn')
+        value_dist.write_image('./app/output/charts/value_size_distribution.png')
 
         # 4. TTL Distribution Histogram
         ttl_distribution = data_profiler['ttl_stats']['ttl_distribution']['histogram']
         ttl_ranges = [f"{bucket['seconds_range']['min']} - {bucket['seconds_range']['max']}" for bucket in ttl_distribution]
         ttl_counts = [bucket['count'] for bucket in ttl_distribution]
         ttl_df = {'TTL Range (seconds)': ttl_ranges, 'Count': ttl_counts}
-        fig = px.bar(
+        ttl_dist = px.bar(
             ttl_df,
             x='TTL Range (seconds)',
             y='Count',
@@ -156,16 +157,16 @@ To begin, please provide your Memcached URL for analysis, or type "skip" to proc
             color='Count',
             color_continuous_scale=px.colors.sequential.Blues
         )
-        fig.update_layout(xaxis_tickangle=-45, height=400, width=800)
-        pio.write_html(fig, './app/output/charts/ttl_distribution.html', full_html=True, include_plotlyjs='cdn')
-        fig.write_image('./app/output/charts/ttl_distribution.png')
+        ttl_dist.update_layout(xaxis_tickangle=-45, height=400, width=800)
+        pio.write_html(ttl_dist, './app/output/charts/ttl_distribution.html', full_html=True, include_plotlyjs='cdn')
+        ttl_dist.write_image('./app/output/charts/ttl_distribution.png')
 
         # 5. Memory per Shard Radial Chart
         memory_per_shard = data_profiler['operational_metrics']['client_connections']['average_per_shard']
         total_memory = data_profiler['memory_analysis']['total_memory_used_bytes']
         
         # Create an interesting gauge chart for memory per shard
-        fig = go.Figure(go.Indicator(
+        memory_gauge = go.Figure(go.Indicator(
             mode = "gauge+number",
             value = memory_per_shard,
             domain = {'x': [0, 1], 'y': [0, 1]},
@@ -185,9 +186,12 @@ To begin, please provide your Memcached URL for analysis, or type "skip" to proc
                 }
             }
         ))
-        fig.update_layout(height=400, width=600)
-        pio.write_html(fig, './app/output/charts/memory_per_shard.html', full_html=True, include_plotlyjs='cdn')
-        fig.write_image('./app/output/charts/memory_per_shard.png')
+        memory_gauge.update_layout(height=400, width=600)
+        pio.write_html(memory_gauge, './app/output/charts/memory_per_shard.html', full_html=True, include_plotlyjs='cdn')
+        memory_gauge.write_image('./app/output/charts/memory_per_shard.png')
+        
+        # Return the plotly figures for inline display
+        return reads_vs_writes, key_dist, value_dist, ttl_dist, memory_gauge
 
     async def handle_response(self, response, chat_history):
         # Handle initial URL input
@@ -234,27 +238,24 @@ To begin, please provide your Memcached URL for analysis, or type "skip" to proc
                     for key, value in self.profiling_results.items():
                         report += f"- {key}: {value}\n"
                 
-                # Generate charts
-                self.generate_charts()
+                # Generate charts and get the plotly figures
+                reads_vs_writes, key_dist, value_dist, ttl_dist, memory_gauge = self.generate_charts()
                 
                 report += "\n## Assessment Summary\n"
                 report += "Based on your responses, here are the key recommendations:\n"
                 report += "\n1. Implementation will be logged here in future updates"
                 report += "\n\n## Visualizations\n"
-                report += "A set of interactive visualizations have been generated. Please check the 'Interactive Visualizations' tab to explore the data in detail.\n\n"
-                report += "Here are preview images of the charts:\n\n"
-                report += "### Reads vs Writes\n"
-                report += "![Reads vs Writes](/charts/reads_vs_writes.png)\n\n"
-                report += "### Key Size Distribution\n"
-                report += "![Key Size Distribution](/charts/key_size_distribution.png)\n\n"
-                report += "### Value Size Distribution\n"
-                report += "![Value Size Distribution](/charts/value_size_distribution.png)\n\n"
-                report += "### TTL Distribution\n"
-                report += "![TTL Distribution](/charts/ttl_distribution.png)\n\n"
-                report += "### Memory per Shard\n"
-                report += "![Memory per Shard](/charts/memory_per_shard.png)\n\n"
-                report += "*For interactive versions of these charts, please switch to the 'Interactive Visualizations' tab.*"
+                report += "Here are interactive visualizations of your Memcached data:\n\n"
+                
+                # Add the report text to chat history
                 chat_history.append((None, report))
+                
+                # Add each chart as a separate message with a Gradio plot component
+                chat_history.append((None, gr.Plot(reads_vs_writes, label="Reads vs Writes")))
+                chat_history.append((None, gr.Plot(key_dist, label="Key Size Distribution")))
+                chat_history.append((None, gr.Plot(value_dist, label="Value Size Distribution")))
+                chat_history.append((None, gr.Plot(ttl_dist, label="TTL Distribution")))
+                chat_history.append((None, gr.Plot(memory_gauge, label="Memory per Shard")))
             
             return chat_history, ""
         return chat_history, ""
