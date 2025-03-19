@@ -78,21 +78,29 @@ To begin, please provide your Memcached URL for analysis, or type "skip" to proc
 
     def render_question(self, section, subsection):
         if "isMultiSelect" in subsection and subsection["isMultiSelect"]:
-            # Create numbered options with emoji checkboxes for multi-select
-            options = "\n".join([f"{i+1}. ☐ {opt}" for i, opt in enumerate(subsection["options"])])
+            # Create buttons for multi-select options with different styling
+            buttons_html = ""
+            for i, opt in enumerate(subsection["options"]):
+                # Use the actual option text as the value
+                buttons_html += f'<a class="btn btn-primary btn-chatbot text-white" value="{opt}">{opt}</a> '
+            
             return f"""### {section['name']}
 #### {subsection['name']}
-Select all that apply (type the numbers of your selections separated by commas):
+Select all that apply (click on your choices):
 
-{options}"""
+{buttons_html}"""
         else:
-            # Create numbered options for single-select
-            options = "\n".join([f"{i+1}. {opt}" for i, opt in enumerate(subsection["options"])])
+            # Create buttons for single-select options
+            buttons_html = ""
+            for i, opt in enumerate(subsection["options"]):
+                # Use the actual option text as the value
+                buttons_html += f'<a class="btn btn-primary btn-chatbot text-white" value="{opt}">{opt}</a> '
+            
             return f"""### {section['name']}
 #### {subsection['name']}
-Select one option (type the number of your selection):
+Select one option (click on your choice):
 
-{options}"""
+{buttons_html}"""
 
     def generate_charts(self):
         # Create charts directory if it doesn't exist
@@ -203,35 +211,6 @@ Select one option (type the number of your selection):
         # Return the plotly figures for inline display
         return reads_vs_writes, key_dist, value_dist, ttl_dist, memory_gauge
 
-    async def generate_final_report(self, chat_history):
-        # Generate final report
-        report = "# Migration Assessment Report\n\n"
-        if self.profiling_results:
-            report += "## Memcached Profile\n"
-            for key, value in self.profiling_results.items():
-                report += f"- {key}: {value}\n"
-        
-        # Generate charts and get the plotly figures
-        reads_vs_writes, key_dist, value_dist, ttl_dist, memory_gauge = self.generate_charts()
-        
-        report += "\n## Assessment Summary\n"
-        report += "Based on your responses, here are the key recommendations:\n"
-        report += "\n1. Implementation will be logged here in future updates"
-        report += "\n\n## Visualizations\n"
-        report += "Here are interactive visualizations of your Memcached data:\n\n"
-        
-        # Add the report text to chat history
-        chat_history.append((None, report))
-        
-        # Add each chart as a separate message with a Gradio plot component
-        chat_history.append((None, gr.Plot(reads_vs_writes, label="Reads vs Writes")))
-        chat_history.append((None, gr.Plot(key_dist, label="Key Size Distribution")))
-        chat_history.append((None, gr.Plot(value_dist, label="Value Size Distribution")))
-        chat_history.append((None, gr.Plot(ttl_dist, label="TTL Distribution")))
-        chat_history.append((None, gr.Plot(memory_gauge, label="Memory per Shard")))
-        
-        return chat_history
-
     async def handle_response(self, response, chat_history):
         # Handle initial URL input
         print(f"Chat history length: {len(chat_history)}")
@@ -254,29 +233,29 @@ Select one option (type the number of your selection):
         if section and subsection:
             key = f"{section['name']}_{subsection['name']}"
             
-            # Process numeric selections
+            # Process button selections (which now contain the actual option text)
             try:
                 if "isMultiSelect" in subsection and subsection["isMultiSelect"]:
-                    # For multi-select, process comma-separated numbers
-                    selection_nums = [int(num.strip()) for num in response.split(',')]
-                    selected_options = [subsection["options"][num-1] for num in selection_nums if 1 <= num <= len(subsection["options"])]
-                    self.responses[key] = selected_options
+                    # For multi-select, process comma-separated values
+                    selected_options = [opt.strip() for opt in response.split(',')]
+                    # Validate that all options exist in the available options
+                    valid_options = [opt for opt in selected_options if opt in subsection["options"]]
+                    self.responses[key] = valid_options
                     # Format the response to show what was selected
-                    formatted_response = f"Selected: {', '.join(selected_options)}"
+                    formatted_response = f"Selected: {', '.join(valid_options)}"
                 else:
-                    # For single-select, process a single number
-                    selection_num = int(response.strip())
-                    if 1 <= selection_num <= len(subsection["options"]):
-                        selected_option = subsection["options"][selection_num-1]
+                    # For single-select, the response is the option text
+                    if response in subsection["options"]:
+                        selected_option = response
                         self.responses[key] = selected_option
                         # Format the response to show what was selected
                         formatted_response = f"Selected: {selected_option}"
                     else:
-                        formatted_response = f"Invalid selection. Please enter a number between 1 and {len(subsection['options'])}."
+                        formatted_response = f"Invalid selection. Please select one of the provided options."
                         chat_history.append((response, formatted_response))
                         return chat_history, ""
-            except (ValueError, IndexError):
-                formatted_response = "Invalid selection. Please enter a valid number."
+            except Exception as e:
+                formatted_response = f"Error processing selection: {str(e)}"
                 chat_history.append((response, formatted_response))
                 return chat_history, ""
             
@@ -296,7 +275,30 @@ Select one option (type the number of your selection):
                 chat_history.append((None, question))
             else:
                 # Generate final report
-                chat_history = await self.generate_final_report(chat_history)
+                report = "# Migration Assessment Report\n\n"
+                if self.profiling_results:
+                    report += "## Memcached Profile\n"
+                    for key, value in self.profiling_results.items():
+                        report += f"- {key}: {value}\n"
+                
+                # Generate charts and get the plotly figures
+                reads_vs_writes, key_dist, value_dist, ttl_dist, memory_gauge = self.generate_charts()
+                
+                report += "\n## Assessment Summary\n"
+                report += "Based on your responses, here are the key recommendations:\n"
+                report += "\n1. Implementation will be logged here in future updates"
+                report += "\n\n## Visualizations\n"
+                report += "Here are interactive visualizations of your Memcached data:\n\n"
+                
+                # Add the report text to chat history
+                chat_history.append((None, report))
+                
+                # Add each chart as a separate message with a Gradio plot component
+                chat_history.append((None, gr.Plot(reads_vs_writes, label="Reads vs Writes")))
+                chat_history.append((None, gr.Plot(key_dist, label="Key Size Distribution")))
+                chat_history.append((None, gr.Plot(value_dist, label="Value Size Distribution")))
+                chat_history.append((None, gr.Plot(ttl_dist, label="TTL Distribution")))
+                chat_history.append((None, gr.Plot(memory_gauge, label="Memory per Shard")))
             
             return chat_history, ""
         return chat_history, ""

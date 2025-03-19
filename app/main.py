@@ -24,237 +24,31 @@ def create_gradio_interface():
     with gr.Blocks(theme=gr.themes.Default(font=[gr.themes.GoogleFont("Inconsolata"), "Arial", "sans-serif"])) as interface:
         gr.Markdown("# Quester - Redis Migration Assessment Tool")
         
-        with gr.Row():
-            with gr.Column(scale=2):
-                # Chat Tab
-                chatbot = gr.Chatbot(
-                    label="Redis Migration Assessment",
-                    render=True,
-                    height=600
-                )
-                msg = gr.Textbox(
-                    label="Your Response",
-                    placeholder="Type your response here..."
-                )
-                clear = gr.Button("Start Over")
-            
-            with gr.Column(scale=1):
-                # Dynamic options area
-                options_container = gr.Group(visible=False)
-                with options_container:
-                    question_header = gr.Markdown("### Question")
-                    
-                    # For single select questions
-                    single_select_container = gr.Group(visible=False)
-                    with single_select_container:
-                        single_select = gr.Radio(
-                            choices=[],
-                            label="Select one option",
-                            interactive=True
-                        )
-                        submit_single = gr.Button("Submit Selection")
-                    
-                    # For multi select questions
-                    multi_select_container = gr.Group(visible=False)
-                    with multi_select_container:
-                        multi_select = gr.CheckboxGroup(
-                            choices=[],
-                            label="Select all that apply",
-                            interactive=True
-                        )
-                        submit_multi = gr.Button("Submit Selections")
+        # Chat Tab - Now the only tab
+        chatbot = gr.Chatbot(
+            label="Redis Migration Assessment",
+            render=True,  # Enable rendering of components
+            height=600
+        )
+        msg = gr.Textbox(
+            label="Your Response",
+            placeholder="Type your response here...",
+            elem_id="inputTextBox"  # Add elem_id for JavaScript to target
+        )
+        clear = gr.Button("Start Over")
         
-        # Function to handle initial URL input and show first question
-        async def initial_response(message, chat_history):
-            result = await chat_ui.handle_url_input(message)
-            chat_history.append((message, result))
-            
-            if not chat_ui.is_url_validated:
-                return chat_history, "", gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(), gr.update(choices=[]), gr.update(choices=[])
-            
-            # Get first question
-            section, subsection = chat_ui.get_current_question()
-            if section and subsection:
-                question_text = f"### {section['name']}\n#### {subsection['name']}"
-                chat_history.append((None, f"Please select an option from the panel on the right."))
-                
-                # Update options based on question type
-                if "isMultiSelect" in subsection and subsection["isMultiSelect"]:
-                    return (
-                        chat_history, 
-                        "", 
-                        gr.update(visible=True),  # options_container 
-                        gr.update(visible=False),  # single_select_container
-                        gr.update(visible=True),  # multi_select_container
-                        gr.update(value=question_text),  # question_header
-                        gr.update(value=None, choices=[]),  # single_select - clear choices
-                        gr.update(value=[], choices=subsection["options"])  # multi_select - set new choices
-                    )
-                else:
-                    return (
-                        chat_history, 
-                        "", 
-                        gr.update(visible=True),  # options_container
-                        gr.update(visible=True),  # single_select_container
-                        gr.update(visible=False),  # multi_select_container
-                        gr.update(value=question_text),  # question_header
-                        gr.update(value=None, choices=subsection["options"]),  # single_select - set new choices
-                        gr.update(value=[], choices=[])  # multi_select - clear choices
-                    )
-            
-            return chat_history, "", gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(), gr.update(choices=[]), gr.update(choices=[])
+        async def respond(message, chat_history):
+            return await chat_ui.handle_response(message, chat_history)
         
-        # Function to handle single selection submission
-        async def submit_single_selection(selection, chat_history):
-            if not selection:
-                return chat_history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
-            
-            section, subsection = chat_ui.get_current_question()
-            if not section or not subsection:
-                return chat_history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
-            
-            # Process the selection
-            key = f"{section['name']}_{subsection['name']}"
-            chat_ui.responses[key] = selection
-            
-            # Add to chat history
-            chat_history.append((f"Selected: {selection}", None))
-            
-            # Move to next question
-            if chat_ui.current_subsection + 1 < len(section["subSections"]):
-                chat_ui.current_subsection += 1
-            else:
-                chat_ui.current_section += 1
-                chat_ui.current_subsection = 0
-            
-            # Get next question
-            new_section, new_subsection = chat_ui.get_current_question()
-            if new_section and new_subsection:
-                question_text = f"### {new_section['name']}\n#### {new_subsection['name']}"
-                chat_history.append((None, f"Please select an option from the panel on the right."))
-                
-                # Update options based on question type
-                if "isMultiSelect" in new_subsection and new_subsection["isMultiSelect"]:
-                    return (
-                        chat_history,
-                        gr.update(visible=True),  # options_container 
-                        gr.update(visible=False),  # single_select_container
-                        gr.update(visible=True),  # multi_select_container
-                        gr.update(value=question_text),  # question_header
-                        gr.update(value=None, choices=[]),  # single_select - clear previous choices
-                        gr.update(value=[], choices=new_subsection["options"])  # multi_select - set new choices
-                    )
-                else:
-                    return (
-                        chat_history,
-                        gr.update(visible=True),  # options_container
-                        gr.update(visible=True),  # single_select_container
-                        gr.update(visible=False),  # multi_select_container
-                        gr.update(value=question_text),  # question_header
-                        gr.update(value=None, choices=new_subsection["options"]),  # single_select - set new choices
-                        gr.update(value=[], choices=[])  # multi_select - clear previous choices
-                    )
-            else:
-                # Generate final report
-                report = await chat_ui.generate_final_report(chat_history)
-                return report, gr.update(visible=False), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
-        
-        # Function to handle multi selection submission
-        async def submit_multi_selection(selections, chat_history):
-            if not selections:
-                return chat_history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
-            
-            section, subsection = chat_ui.get_current_question()
-            if not section or not subsection:
-                return chat_history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
-            
-            # Process the selections
-            key = f"{section['name']}_{subsection['name']}"
-            chat_ui.responses[key] = selections
-            
-            # Add to chat history
-            chat_history.append((f"Selected: {', '.join(selections)}", None))
-            
-            # Move to next question
-            if chat_ui.current_subsection + 1 < len(section["subSections"]):
-                chat_ui.current_subsection += 1
-            else:
-                chat_ui.current_section += 1
-                chat_ui.current_subsection = 0
-            
-            # Get next question
-            new_section, new_subsection = chat_ui.get_current_question()
-            if new_section and new_subsection:
-                question_text = f"### {new_section['name']}\n#### {new_subsection['name']}"
-                chat_history.append((None, f"Please select an option from the panel on the right."))
-                
-                # Update options based on question type
-                if "isMultiSelect" in new_subsection and new_subsection["isMultiSelect"]:
-                    return (
-                        chat_history,
-                        gr.update(visible=True),  # options_container 
-                        gr.update(visible=False),  # single_select_container
-                        gr.update(visible=True),  # multi_select_container
-                        gr.update(value=question_text),  # question_header
-                        gr.update(value=None, choices=[]),  # single_select - clear previous choices
-                        gr.update(value=[], choices=new_subsection["options"])  # multi_select - set new choices
-                    )
-                else:
-                    return (
-                        chat_history,
-                        gr.update(visible=True),  # options_container
-                        gr.update(visible=True),  # single_select_container
-                        gr.update(visible=False),  # multi_select_container
-                        gr.update(value=question_text),  # question_header
-                        gr.update(value=None, choices=new_subsection["options"]),  # single_select - set new choices
-                        gr.update(value=[], choices=[])  # multi_select - clear previous choices
-                    )
-            else:
-                # Generate final report
-                report = await chat_ui.generate_final_report(chat_history)
-                return report, gr.update(visible=False), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
-        
-        # Reset function
-        def reset():
-            chat_history = [(None, chat_ui.welcome_message)]
-            chat_ui.reset()
-            return (
-                chat_history, 
-                gr.update(visible=False),  # options_container
-                gr.update(visible=False),  # single_select_container
-                gr.update(visible=False),  # multi_select_container
-                gr.update(value=""),  # question_header
-                gr.update(choices=[]),  # single_select
-                gr.update(choices=[])  # multi_select
-            )
-        
-        # Connect event handlers
         msg.submit(
-            initial_response,
+            respond,
             [msg, chatbot],
-            [chatbot, msg, options_container, single_select_container, multi_select_container, 
-             question_header, single_select, multi_select]
-        )
-        
-        submit_single.click(
-            submit_single_selection,
-            [single_select, chatbot],
-            [chatbot, options_container, single_select_container, multi_select_container, 
-             question_header, single_select, multi_select]
-        )
-        
-        submit_multi.click(
-            submit_multi_selection,
-            [multi_select, chatbot],
-            [chatbot, options_container, single_select_container, multi_select_container, 
-             question_header, single_select, multi_select]
+            [chatbot, msg]
         )
         
         clear.click(
-            reset,
-            [],
-            [chatbot, options_container, single_select_container, multi_select_container, 
-             question_header, single_select, multi_select]
+            chat_ui.reset,
+            outputs=[chatbot]
         )
         
         interface.load(
@@ -263,6 +57,103 @@ def create_gradio_interface():
         )
     
     return interface
+
+# Function to reload JavaScript for button functionality
+def reload_javascript():
+    js = """
+    <!-- Bootstrap CSS and JS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
+
+    <!-- Custom CSS for buttons -->
+    <style>
+    .btn-chatbot {
+        margin: 5px;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    .btn-primary.btn-chatbot {
+        background-color: #2E75B6;
+        border-color: #2E75B6;
+    }
+    .btn-primary.btn-chatbot:hover {
+        background-color: #1A5DAB;
+        border-color: #1A5DAB;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .btn-secondary.btn-chatbot {
+        background-color: #6c757d;
+        border-color: #6c757d;
+    }
+    .btn-secondary.btn-chatbot:hover {
+        background-color: #5a6268;
+        border-color: #5a6268;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .btn-success.btn-chatbot {
+        background-color: #28a745;
+        border-color: #28a745;
+    }
+    .btn-success.btn-chatbot:hover {
+        background-color: #218838;
+        border-color: #218838;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    </style>
+
+    <!-- JavaScript for button functionality -->
+    <script>
+    function registerMessageButtons() {
+        const collection = document.querySelectorAll(".btn-chatbot");
+        for (let i = 0; i < collection.length; i++) {
+            collection[i].onclick = function() {
+                const elem = document.getElementById("inputTextBox").getElementsByTagName('textarea')[0];
+                elem.value = collection[i].getAttribute("value");
+                elem.dispatchEvent(new Event('input', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true
+                }));
+                
+                // Trigger the Enter key press to submit the form
+                elem.dispatchEvent(new KeyboardEvent('keydown', {
+                    key: 'Enter',
+                    code: 'Enter',
+                    keyCode: 13,
+                    which: 13,
+                    bubbles: true,
+                    cancelable: true
+                }));
+            };
+        }
+    }
+    
+    // Run registerMessageButtons periodically to catch new buttons
+    var intervalId = window.setInterval(function(){
+        registerMessageButtons();
+    }, 1000);
+    </script>
+    """
+    
+    # Store the original TemplateResponse
+    GradioTemplateResponseOriginal = gr.routes.templates.TemplateResponse
+    
+    # Override the TemplateResponse to inject our JavaScript
+    def template_response(*args, **kwargs):
+        res = GradioTemplateResponseOriginal(*args, **kwargs)
+        res.body = res.body.replace(b'</html>', f'{js}</html>'.encode("utf8"))
+        res.init_headers()
+        return res
+    
+    gr.routes.templates.TemplateResponse = template_response
+
+# Apply JavaScript injection
+reload_javascript()
 
 # Mount Gradio interface
 app = gr.mount_gradio_app(app, create_gradio_interface(), path="/")
