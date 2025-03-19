@@ -26,7 +26,9 @@ def create_gradio_interface():
         
         # Chat Tab - Now the only tab
         chatbot = gr.Chatbot(
-            label="Redis Migration Assessment"
+            label="Redis Migration Assessment",
+            render=True,  # Enable rendering of components
+            height=600
         )
         msg = gr.Textbox(
             label="Your Response",

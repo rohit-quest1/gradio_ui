@@ -78,11 +78,21 @@ To begin, please provide your Memcached URL for analysis, or type "skip" to proc
 
     def render_question(self, section, subsection):
         if "isMultiSelect" in subsection and subsection["isMultiSelect"]:
-            options = "\n".join([f"- {opt}" for opt in subsection["options"]])
-            return f"### {section['name']}\n#### {subsection['name']}\nSelect all that apply:\n{options}"
+            # Create numbered options with emoji checkboxes for multi-select
+            options = "\n".join([f"{i+1}. ☐ {opt}" for i, opt in enumerate(subsection["options"])])
+            return f"""### {section['name']}
+#### {subsection['name']}
+Select all that apply (type the numbers of your selections separated by commas):
+
+{options}"""
         else:
+            # Create numbered options for single-select
             options = "\n".join([f"{i+1}. {opt}" for i, opt in enumerate(subsection["options"])])
-            return f"### {section['name']}\n#### {subsection['name']}\n{options}"
+            return f"""### {section['name']}
+#### {subsection['name']}
+Select one option (type the number of your selection):
+
+{options}"""
 
     def generate_charts(self):
         # Create charts directory if it doesn't exist
@@ -214,7 +224,32 @@ To begin, please provide your Memcached URL for analysis, or type "skip" to proc
         section, subsection = self.get_current_question()
         if section and subsection:
             key = f"{section['name']}_{subsection['name']}"
-            self.responses[key] = response
+            
+            # Process numeric selections
+            try:
+                if "isMultiSelect" in subsection and subsection["isMultiSelect"]:
+                    # For multi-select, process comma-separated numbers
+                    selection_nums = [int(num.strip()) for num in response.split(',')]
+                    selected_options = [subsection["options"][num-1] for num in selection_nums if 1 <= num <= len(subsection["options"])]
+                    self.responses[key] = selected_options
+                    # Format the response to show what was selected
+                    formatted_response = f"Selected: {', '.join(selected_options)}"
+                else:
+                    # For single-select, process a single number
+                    selection_num = int(response.strip())
+                    if 1 <= selection_num <= len(subsection["options"]):
+                        selected_option = subsection["options"][selection_num-1]
+                        self.responses[key] = selected_option
+                        # Format the response to show what was selected
+                        formatted_response = f"Selected: {selected_option}"
+                    else:
+                        formatted_response = f"Invalid selection. Please enter a number between 1 and {len(subsection['options'])}."
+                        chat_history.append((response, formatted_response))
+                        return chat_history, ""
+            except (ValueError, IndexError):
+                formatted_response = "Invalid selection. Please enter a valid number."
+                chat_history.append((response, formatted_response))
+                return chat_history, ""
             
             # Move to next question
             if self.current_subsection + 1 < len(section["subSections"]):
@@ -223,7 +258,7 @@ To begin, please provide your Memcached URL for analysis, or type "skip" to proc
                 self.current_section += 1
                 self.current_subsection = 0
             
-            chat_history.append((response, None))
+            chat_history.append((response, formatted_response))
             
             # Check if questionnaire is complete
             new_section, new_subsection = self.get_current_question()
