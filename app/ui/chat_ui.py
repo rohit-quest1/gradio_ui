@@ -203,6 +203,35 @@ Select one option (type the number of your selection):
         # Return the plotly figures for inline display
         return reads_vs_writes, key_dist, value_dist, ttl_dist, memory_gauge
 
+    async def generate_final_report(self, chat_history):
+        # Generate final report
+        report = "# Migration Assessment Report\n\n"
+        if self.profiling_results:
+            report += "## Memcached Profile\n"
+            for key, value in self.profiling_results.items():
+                report += f"- {key}: {value}\n"
+        
+        # Generate charts and get the plotly figures
+        reads_vs_writes, key_dist, value_dist, ttl_dist, memory_gauge = self.generate_charts()
+        
+        report += "\n## Assessment Summary\n"
+        report += "Based on your responses, here are the key recommendations:\n"
+        report += "\n1. Implementation will be logged here in future updates"
+        report += "\n\n## Visualizations\n"
+        report += "Here are interactive visualizations of your Memcached data:\n\n"
+        
+        # Add the report text to chat history
+        chat_history.append((None, report))
+        
+        # Add each chart as a separate message with a Gradio plot component
+        chat_history.append((None, gr.Plot(reads_vs_writes, label="Reads vs Writes")))
+        chat_history.append((None, gr.Plot(key_dist, label="Key Size Distribution")))
+        chat_history.append((None, gr.Plot(value_dist, label="Value Size Distribution")))
+        chat_history.append((None, gr.Plot(ttl_dist, label="TTL Distribution")))
+        chat_history.append((None, gr.Plot(memory_gauge, label="Memory per Shard")))
+        
+        return chat_history
+
     async def handle_response(self, response, chat_history):
         # Handle initial URL input
         print(f"Chat history length: {len(chat_history)}")
@@ -267,30 +296,7 @@ Select one option (type the number of your selection):
                 chat_history.append((None, question))
             else:
                 # Generate final report
-                report = "# Migration Assessment Report\n\n"
-                if self.profiling_results:
-                    report += "## Memcached Profile\n"
-                    for key, value in self.profiling_results.items():
-                        report += f"- {key}: {value}\n"
-                
-                # Generate charts and get the plotly figures
-                reads_vs_writes, key_dist, value_dist, ttl_dist, memory_gauge = self.generate_charts()
-                
-                report += "\n## Assessment Summary\n"
-                report += "Based on your responses, here are the key recommendations:\n"
-                report += "\n1. Implementation will be logged here in future updates"
-                report += "\n\n## Visualizations\n"
-                report += "Here are interactive visualizations of your Memcached data:\n\n"
-                
-                # Add the report text to chat history
-                chat_history.append((None, report))
-                
-                # Add each chart as a separate message with a Gradio plot component
-                chat_history.append((None, gr.Plot(reads_vs_writes, label="Reads vs Writes")))
-                chat_history.append((None, gr.Plot(key_dist, label="Key Size Distribution")))
-                chat_history.append((None, gr.Plot(value_dist, label="Value Size Distribution")))
-                chat_history.append((None, gr.Plot(ttl_dist, label="TTL Distribution")))
-                chat_history.append((None, gr.Plot(memory_gauge, label="Memory per Shard")))
+                chat_history = await self.generate_final_report(chat_history)
             
             return chat_history, ""
         return chat_history, ""
