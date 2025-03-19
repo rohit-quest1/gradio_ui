@@ -1,0 +1,63 @@
+{
+  "start_time": "2025-03-15T12:33:47.5200385+05:30",
+  "end_time": "2025-03-15T12:33:47.5200385+05:30",
+  "duration": 54,
+  "samples": 10,
+  "average_request_rate": 1995.0555555555557,
+  "read_write_ratio": {
+    "read_percent": 24.935720716957665,
+    "write_percent": 75.06427928304234
+  },
+  "cache_performance": {
+    "hit_percent": 100,
+    "miss_percent": 0,
+    "evictions": 77744,
+    "expirations": 1081,
+    "cache_churn": 73.16699618501295
+  },
+  "connections": {
+    "max_active": 11
+  },
+  "operations": {
+    "total_commands": 107733,
+    "get_percent": 24.935720716957665,
+    "set_percent": 75.06427928304234,
+    "delete_percent": 0,
+    "touch_percent": 0
+  },
+  "data_transferred_kb": 43701.166015625,
+  "spike_detection": {
+    "threshold": 1.2,
+    "spike_count": 4,
+    "spike_details": [
+      {
+        "start_time": "2025-03-15T12:33:59.5200385+05:30",
+        "end_time": "2025-03-15T12:34:05.5200385+05:30",
+        "request_rate": 2522.6666666666665,
+        "multiplier": "1.3x",
+        "avg_data_transferred_kb_s": 1021.66650390625
+      },
+      {
+        "start_time": "2025-03-15T12:34:11.5200385+05:30",
+        "end_time": "2025-03-15T12:34:17.5200385+05:30",
+        "request_rate": 2457.5,
+        "multiplier": "1.2x",
+        "avg_data_transferred_kb_s": 1001.2296549479166
+      },
+      {
+        "start_time": "2025-03-15T12:34:17.5200385+05:30",
+        "end_time": "2025-03-15T12:34:23.5200385+05:30",
+        "request_rate": 2489.1666666666665,
+        "multiplier": "1.2x",
+        "avg_data_transferred_kb_s": 1002.6227213541666
+      },
+      {
+        "start_time": "2025-03-15T12:34:35.5200385+05:30",
+        "end_time": "2025-03-15T12:34:41.5200385+05:30",
+        "request_rate": 2492.1666666666665,
+        "multiplier": "1.2x",
+        "avg_data_transferred_kb_s": 1006.71142578125
+      }
+    ]
+  }
+}

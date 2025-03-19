@@ -1,0 +1,69 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.env/
+.venv/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Generated visualizations and output files
+app/output/charts/*.html
+app/output/charts/*.png
+*.png
+*.jpg
+*.jpeg
+*.svg
+
+# Log files
+*.log
+logs/
+
+# Local configuration
+.env
+.env.local
+.env.*.local
+
+# Database files
+*.db
+*.sqlite3
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+
+# Docker related
+docker-compose.override.yml
+
+# Temporary files
+*.bak
+*.tmp
+*~

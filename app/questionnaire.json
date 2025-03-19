@@ -1,0 +1,191 @@
+{
+    "sections": [
+      {
+        "name": "Deployment and Infrastructure",
+        "subSections": [
+          { "name": "Deployment Location", "options": ["On-premises", "Cloud (AWS)", "Cloud (Azure)", "Cloud (GCP)"] },
+          {
+            "name": "Horizontal Scaling Requirement",
+            "options": ["Yes (using Redis Cluster)", "No (single node sufficient)", "Not sure"]
+          },
+          { "name": "Read Replicas Required", "options": ["Yes", "No", "Not sure"] }
+        ]
+      },
+      {
+        "name": "Data Model and Compatibility",
+        "subSections": [
+          {
+            "name": "Current Data Model Complexity",
+            "options": [
+              "Simple key-value (Memcached style)",
+              "Complex data types (e.g., lists, sets, hashes)",
+              "Mixed",
+              "Not sure"
+            ]
+          },
+          {
+            "name": "Redis Data Structure Usage",
+            "options": ["Key-Value Pairs", "Lists", "Sets", "Hashes", "Sorted Sets", "Other (Please specify)"]
+          }
+        ]
+      },
+      {
+        "name": "Performance and Latency",
+        "subSections": [
+          {
+            "name": "Expected Throughput in Redis",
+            "options": [
+              "High throughput (millions of operations per second)",
+              "Moderate throughput",
+              "Low throughput",
+              "Not sure"
+            ]
+          },
+          {
+            "name": "Latency Requirements",
+            "options": [
+              "Ultra-low latency (under 1ms)",
+              "Low latency (under 10ms)",
+              "Tolerable latency (under 100ms)",
+              "Not sure"
+            ]
+          },
+          {
+            "name": "Will you use Redis persistence (AOF/RDB)?",
+            "options": ["Yes, with persistence (AOF/RDB)", "No, purely in-memory", "Not sure"]
+          },
+          {
+            "name": "IOPS (Input/Output Operations Per Second) Needs for Redis",
+            "options": [
+              "High (e.g., thousands of operations per second)",
+              "Moderate (hundreds of operations per second)",
+              "Low (less than 100 operations per second)",
+              "Not sure"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Data Migration Strategy",
+        "subSections": [
+          {
+            "name": "Migration Approach",
+            "options": [
+              "Bulk migration (one-time data move)",
+              "Gradual migration (dual writes, sync both Memcached and Redis)",
+              "Rolling migration (split traffic between Memcached and Redis)",
+              "Not sure"
+            ]
+          },
+          {
+            "name": "Downtime Tolerance During Migration",
+            "options": [
+              "No downtime allowed",
+              "Minimal downtime allowed (seconds/minutes)",
+              "Significant downtime allowed (hours)",
+              "Not sure"
+            ]
+          },
+          { "name": "Rollback Plan", "options": ["Yes, need rollback strategy", "No, no rollback needed", "Not sure"] },
+          {
+            "name": "Are there data types or structures that need modification during migration?",
+            "options": [
+              "Yes, complex data structures need transformation",
+              "No, the data model is straightforward",
+              "Not sure"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "High Availability, Fault Tolerance, and Backup",
+        "subSections": [
+          {
+            "name": "High Availability Requirement",
+            "options": [
+              "Redis Sentinel for failover",
+              "Redis Cluster for sharding and failover",
+              "No high availability needed",
+              "Not sure"
+            ]
+          },
+          {
+            "name": "Backup Frequency",
+            "options": ["Continuous backups (AOF)", "Periodic snapshots (RDB)", "No backups needed", "Not sure"]
+          }
+        ]
+      },
+      {
+        "name": "Security and Access Control",
+        "subSections": [
+          {
+            "name": "Redis Authentication Requirements",
+            "options": ["Yes, password protection required", "No authentication needed", "Not sure"]
+          },
+          { "name": "Encryption in Transit (TLS/SSL) Required?", "options": ["Yes", "No", "Not sure"] },
+          { "name": "Encryption at Rest Required?", "options": ["Yes", "No", "Not sure"] },
+          {
+            "name": "Access Control Mechanisms",
+            "options": [
+              "IP whitelisting",
+              "Redis ACLs for fine-grained access control",
+              "No access control required",
+              "Not sure"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Monitoring and Observability",
+        "subSections": [
+          {
+            "name": "Metrics to Monitor",
+            "options": [
+              "Memory usage",
+              "Command execution times",
+              "Eviction count",
+              "Replication status",
+              "Slow query log",
+              "Other (please specify)"
+            ],
+            "isMultiSelect": true
+          },
+          {
+            "name": "Existing Monitoring Tools",
+            "options": [
+              "Prometheus",
+              "RedisInsight",
+              "Cloud-native monitoring (AWS CloudWatch, Azure Monitor, etc.)",
+              "Custom solution",
+              "Not sure"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Final Considerations",
+        "subSections": [
+          {
+            "name": "Migration Timeframe",
+            "options": [
+              "Immediate (within the next 1-2 weeks)",
+              "Short-term (1-3 months)",
+              "Long-term (6+ months)",
+              "Not sure"
+            ]
+          },
+          {
+            "name": "KPIs for Success",
+            "options": [
+              "Reduced latency",
+              "Increased throughput",
+              "Lower operational costs",
+              "High availability and fault tolerance",
+              "Other (please specify)"
+            ],
+            "isMultiSelect": true
+          }
+        ]
+      }
+    ]
+  }

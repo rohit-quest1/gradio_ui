@@ -1,0 +1,260 @@
+from app.services.memcached_service import validate_memcached_connection, profile_memcached
+import logging
+import json
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+import plotly.io as pio
+
+import asyncio
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+MAX_RETRIES = 3
+
+
+with open("./app/questionnaire.json") as f:
+    QUESTIONNAIRE = json.load(f)
+
+
+class ChatUI:
+    def __init__(self):
+        self.current_section = 0
+        self.current_subsection = 0
+        self.responses = {}
+        self.memcached_url = None
+        self.profiling_results = None
+        self.is_url_validated = False
+        self.welcome_message = """
+# Welcome to Quester - Redis Migration Assessment Tool
+
+I'm your AI assistant specializing in Memcached to Redis migrations. I'll help you assess your migration initiative through a series of questions and technical analysis.
+
+To begin, please provide your Memcached URL for analysis, or type "skip" to proceed with the questionnaire."""
+
+    def reset(self):
+        self.current_section = 0
+        self.current_subsection = 0
+        self.responses = {}
+        self.memcached_url = None
+        self.profiling_results = None
+        self.is_url_validated = False
+        return [(None, self.welcome_message)]
+
+    async def handle_url_input(self, url: str) -> str:
+        if url.lower() == "skip":
+            # Allow skipping and proceed to questionnaire
+            self.is_url_validated = True  # Set this to true even though we're skipping
+            return "Skipping Memcached connection. Proceeding with the questionnaire."
+        
+        is_valid = await validate_memcached_connection(url)
+        if is_valid:
+            self.memcached_url = url
+            self.is_url_validated = True
+            # Start profiling asynchronously
+            asyncio.create_task(self.start_profiling())
+            return "Successfully connected to Memcached. Starting profiling in background. Let's proceed with the assessment questions."
+        else:
+            # Reset state to initial and return to welcome
+            self.reset()
+            return f"Failed to connect to Memcached after {MAX_RETRIES} attempts. Please try again with a valid URL or type 'skip' to proceed without connection analysis."
+
+    async def start_profiling(self):
+        if self.memcached_url:
+            self.profiling_results = await profile_memcached(self.memcached_url)
+            logger.info("Profiling completed")
+
+    def get_current_question(self):
+        if self.current_section >= len(QUESTIONNAIRE["sections"]):
+            return None, None
+        section = QUESTIONNAIRE["sections"][self.current_section]
+        subsection = section["subSections"][self.current_subsection]
+        return section, subsection
+
+    def render_question(self, section, subsection):
+        if "isMultiSelect" in subsection and subsection["isMultiSelect"]:
+            options = "\n".join([f"- {opt}" for opt in subsection["options"]])
+            return f"### {section['name']}\n#### {subsection['name']}\nSelect all that apply:\n{options}"
+        else:
+            options = "\n".join([f"{i+1}. {opt}" for i, opt in enumerate(subsection["options"])])
+            return f"### {section['name']}\n#### {subsection['name']}\n{options}"
+
+    def generate_charts(self):
+        # Create charts directory if it doesn't exist
+        os.makedirs("./app/output/charts", exist_ok=True)
+        
+        # Load data from JSON files
+        with open("./app/output/data_profiler_stats.json") as f:
+            data_profiler = json.load(f)
+        with open("./app/output/usage_profiler_stats.json") as f:
+            usage_profiler = json.load(f)
+
+        # 1. Reads vs Writes Pie Chart
+        read_percent = usage_profiler['read_write_ratio']['read_percent']
+        write_percent = usage_profiler['read_write_ratio']['write_percent']
+        fig = px.pie(
+            values=[read_percent, write_percent], 
+            names=['Reads', 'Writes'],
+            title='Reads vs Writes',
+            color_discrete_sequence=px.colors.sequential.Blues_r
+        )
+        fig.update_traces(textinfo='percent+label')
+        fig.update_layout(height=400, width=600)
+        # Save as full HTML with Plotly.js included
+        pio.write_html(fig, './app/output/charts/reads_vs_writes.html', full_html=True, include_plotlyjs='cdn')
+        # Also save as image for the chat tab
+        fig.write_image('./app/output/charts/reads_vs_writes.png')
+
+        # 2. Key Size Distribution Histogram
+        key_size_distribution = data_profiler['key_value_stats']['key_stats']['key_size_distribution']['buckets']
+        key_sizes = [bucket['bytes_range']['max'] for bucket in key_size_distribution]
+        key_counts = [bucket['count'] for bucket in key_size_distribution]
+        key_size_df = {'Key Size (bytes)': key_sizes, 'Count': key_counts}
+        fig = px.bar(
+            key_size_df, 
+            x='Key Size (bytes)', 
+            y='Count',
+            title='Key Size Distribution',
+            color='Count',
+            color_continuous_scale=px.colors.sequential.Blues
+        )
+        fig.update_layout(bargap=0.1, height=400, width=800)
+        pio.write_html(fig, './app/output/charts/key_size_distribution.html', full_html=True, include_plotlyjs='cdn')
+        fig.write_image('./app/output/charts/key_size_distribution.png')
+
+        # 3. Value Size Distribution Histogram
+        value_size_distribution = data_profiler['key_value_stats']['value_analysis']['value_size_distribution']['buckets']
+        value_sizes = [bucket['bytes_range']['max'] for bucket in value_size_distribution]
+        value_counts = [bucket['count'] for bucket in value_size_distribution]
+        value_size_df = {'Value Size (bytes)': value_sizes, 'Count': value_counts}
+        fig = px.bar(
+            value_size_df, 
+            x='Value Size (bytes)', 
+            y='Count',
+            title='Value Size Distribution',
+            color='Count',
+            color_continuous_scale=px.colors.sequential.Blues
+        )
+        fig.update_layout(bargap=0.1, height=400, width=800)
+        pio.write_html(fig, './app/output/charts/value_size_distribution.html', full_html=True, include_plotlyjs='cdn')
+        fig.write_image('./app/output/charts/value_size_distribution.png')
+
+        # 4. TTL Distribution Histogram
+        ttl_distribution = data_profiler['ttl_stats']['ttl_distribution']['histogram']
+        ttl_ranges = [f"{bucket['seconds_range']['min']} - {bucket['seconds_range']['max']}" for bucket in ttl_distribution]
+        ttl_counts = [bucket['count'] for bucket in ttl_distribution]
+        ttl_df = {'TTL Range (seconds)': ttl_ranges, 'Count': ttl_counts}
+        fig = px.bar(
+            ttl_df,
+            x='TTL Range (seconds)',
+            y='Count',
+            title='TTL Distribution',
+            color='Count',
+            color_continuous_scale=px.colors.sequential.Blues
+        )
+        fig.update_layout(xaxis_tickangle=-45, height=400, width=800)
+        pio.write_html(fig, './app/output/charts/ttl_distribution.html', full_html=True, include_plotlyjs='cdn')
+        fig.write_image('./app/output/charts/ttl_distribution.png')
+
+        # 5. Memory per Shard Radial Chart
+        memory_per_shard = data_profiler['operational_metrics']['client_connections']['average_per_shard']
+        total_memory = data_profiler['memory_analysis']['total_memory_used_bytes']
+        
+        # Create an interesting gauge chart for memory per shard
+        fig = go.Figure(go.Indicator(
+            mode = "gauge+number",
+            value = memory_per_shard,
+            domain = {'x': [0, 1], 'y': [0, 1]},
+            title = {'text': "Memory per Shard"},
+            gauge = {
+                'axis': {'range': [None, 100]},
+                'bar': {'color': "#2E75B6"},
+                'steps': [
+                    {'range': [0, 30], 'color': "#D6EAF8"},
+                    {'range': [30, 70], 'color': "#AED6F1"},
+                    {'range': [70, 100], 'color': "#3498DB"}
+                ],
+                'threshold': {
+                    'line': {'color': "red", 'width': 4},
+                    'thickness': 0.75,
+                    'value': 80
+                }
+            }
+        ))
+        fig.update_layout(height=400, width=600)
+        pio.write_html(fig, './app/output/charts/memory_per_shard.html', full_html=True, include_plotlyjs='cdn')
+        fig.write_image('./app/output/charts/memory_per_shard.png')
+
+    async def handle_response(self, response, chat_history):
+        # Handle initial URL input
+        print(f"Chat history length: {len(chat_history)}")
+        print(f"Response received: {response}")
+        
+        if len(chat_history) == 1 and chat_history[0][0] is None:  # Only welcome message present
+            print("Processing URL input")
+            result = await self.handle_url_input(response)
+            chat_history.append((response, result))
+            if not self.is_url_validated:
+                return chat_history, ""  # Early return if URL is not validated
+            section, subsection = self.get_current_question()
+            if section and subsection:
+                question = self.render_question(section, subsection)
+                chat_history.append((None, question))
+            return chat_history, ""
+        
+        # Handle questionnaire responses
+        section, subsection = self.get_current_question()
+        if section and subsection:
+            key = f"{section['name']}_{subsection['name']}"
+            self.responses[key] = response
+            
+            # Move to next question
+            if self.current_subsection + 1 < len(section["subSections"]):
+                self.current_subsection += 1
+            else:
+                self.current_section += 1
+                self.current_subsection = 0
+            
+            chat_history.append((response, None))
+            
+            # Check if questionnaire is complete
+            new_section, new_subsection = self.get_current_question()
+            if new_section and new_subsection:
+                question = self.render_question(new_section, new_subsection)
+                chat_history.append((None, question))
+            else:
+                # Generate final report
+                report = "# Migration Assessment Report\n\n"
+                if self.profiling_results:
+                    report += "## Memcached Profile\n"
+                    for key, value in self.profiling_results.items():
+                        report += f"- {key}: {value}\n"
+                
+                # Generate charts
+                self.generate_charts()
+                
+                report += "\n## Assessment Summary\n"
+                report += "Based on your responses, here are the key recommendations:\n"
+                report += "\n1. Implementation will be logged here in future updates"
+                report += "\n\n## Visualizations\n"
+                report += "A set of interactive visualizations have been generated. Please check the 'Interactive Visualizations' tab to explore the data in detail.\n\n"
+                report += "Here are preview images of the charts:\n\n"
+                report += "### Reads vs Writes\n"
+                report += "![Reads vs Writes](/charts/reads_vs_writes.png)\n\n"
+                report += "### Key Size Distribution\n"
+                report += "![Key Size Distribution](/charts/key_size_distribution.png)\n\n"
+                report += "### Value Size Distribution\n"
+                report += "![Value Size Distribution](/charts/value_size_distribution.png)\n\n"
+                report += "### TTL Distribution\n"
+                report += "![TTL Distribution](/charts/ttl_distribution.png)\n\n"
+                report += "### Memory per Shard\n"
+                report += "![Memory per Shard](/charts/memory_per_shard.png)\n\n"
+                report += "*For interactive versions of these charts, please switch to the 'Interactive Visualizations' tab.*"
+                chat_history.append((None, report))
+            
+            return chat_history, ""
+        return chat_history, ""
